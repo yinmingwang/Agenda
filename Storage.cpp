@@ -1,0 +1,278 @@
+#include "Storage.h"
+#include <iostream>
+#include <list>
+#include <string>
+#include <functional>
+#include <fstream>
+using namespace std;
+
+Storage* Storage::instance_ = NULL;
+
+// Singleton
+Storage::Storage() {
+    readFromFile("agenda.data");
+    //readFromFile("a.txt");
+    writeToFile("agenda.data");
+}
+
+Storage* Storage::getInstance() {
+    if ( instance_ == NULL ) {
+        instance_ = new Storage();
+    }
+    return instance_;
+}
+
+Storage::~Storage() {
+    writeToFile("agenda.data");
+    Storage::instance_ = NULL;
+}
+
+/*
+// DISALLOW_COPY_AND_ASSIGN
+Storage::Storage(const Storage& s) {
+  userList_ = s.userList_;
+  meetingList_ = s.meetingList_;
+}
+
+void Storage::operator=(const Storage& s) {
+  userList_ = s.userList_;
+  meetingList_ = s.meetingList_;
+}
+*/
+
+//IO
+bool Storage::readFromFile(const char *fpath) {
+    fstream f(fpath, ios::in);
+    if ( !f ) {
+        return false;
+    }
+
+    string s;
+    f >> s;
+    int p;
+    string t;
+
+    // read User
+    int aa;
+    sscanf( s.c_str(), "{collection:\"User\",total:%d}", &aa);
+    User u;
+
+    for ( int i = 0; i < aa; i++ ) {
+        getline(f, s, '}');
+        // set name
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        u.setName(t);
+        //cout << t << endl;
+        // set pass
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        u.setPassword(t);
+        //cout << t << endl;
+        // set email
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        u.setEmail(t);
+        //cout << t << endl;
+        // set phone
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        u.setPhone(t);
+        //cout << t << endl;
+        userList_.push_back(u);
+    }
+
+    f >> s;
+    sscanf( s.c_str(), "{collection:\"Meeting\",total:%d}", &aa);
+    // read Meeting
+    Meeting m;
+
+    for ( int i = 0; i < aa; i++ ) {
+        getline(f, s, '}');
+        // set sponsor
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        m.setSponsor(t);
+        //cout << t << endl;
+        // set participator
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        m.setParticipator(t);
+        //cout << t << endl;
+        // set sdate
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        m.setStartDate(Date::stringToDate(t));
+        //cout << t << endl;
+        // set edate
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        m.setEndDate(Date::stringToDate(t));
+        //cout << t << endl;
+        // set title
+        p = s.find_first_of('"');
+        s.erase(0, p + 1);
+        p = s.find_first_of('"');
+        t = s.substr(0, p);
+        s.erase(0, p + 1);
+        m.setTitle(t);
+        meetingList_.push_back(m);
+        //cout << t << endl;
+    }
+
+    f.close();
+    return true;
+}
+
+bool Storage::writeToFile(const char *fpath) {
+    fstream f(fpath, ios::out);
+    if ( !f ) {
+        return false;
+    }
+
+    f << "{collection:\"User\",total:" << userList_.size() << "}" << endl;
+    
+    list<User>::iterator it = userList_.begin();
+    for ( ; it != userList_.end(); it++ ) {
+        f << "{name:\"" << it->getName()
+          << "\",password:\"" << it->getPassword()
+          << "\",email:\"" << it->getEmail()
+          << "\",phone:\"" << it->getPhone()
+          << "\"}" << endl;
+    }
+    
+    f << "{collection:\"Meeting\",total:" << meetingList_.size() << "}" << endl;
+    
+    list<Meeting>::iterator ita = meetingList_.begin();
+    for ( ; ita != meetingList_.end(); ita++ ) {
+        f << "{sponsor:\"" << ita->getSponsor()
+          << "\",participator:\"" << ita->getParticipator()
+          << "\",sdate:\"" << Date::dateToString(ita->getStartDate())
+          << "\",edate:\"" << Date::dateToString(ita->getEndDate())
+          << "\",title:\"" << ita->getTitle()
+          << "\"}" << endl;
+    }
+    f.close();
+    return true;
+}
+
+// CRUD
+void Storage::createUser(const User& u) {
+    userList_.push_back(u);
+    writeToFile("agenda.data");
+}
+
+list<User> Storage::queryUser(function<bool(const User&)> filter) {
+    list<User>::iterator it = userList_.begin();
+    list<User> u;
+    for ( ; it != userList_.end(); ++it ) {
+        if ( filter(*it) ) {
+            u.push_back(*it);
+        }
+    }
+    writeToFile("agenda.data");
+    return u;
+}
+
+int Storage::updateUser(function<bool(const User&)> filter,
+               function<void(User&)> switcher) {
+    int count = 0;
+    list<User>::iterator it = userList_.begin();
+    for ( ; it != userList_.end(); ++it ) {
+        if ( filter(*it) ) {
+            switcher(*it);
+            count++;
+        }
+    }
+    writeToFile("agenda.data");
+    return count;
+}
+
+int Storage::deleteUser(function<bool(const User&)> filter) {
+    int count = 0;
+    list<User>::iterator it = userList_.begin();
+    for ( ; it != userList_.end(); ) {
+        if ( filter(*it) ) {
+            it = userList_.erase(it);
+            count++;
+        } else {
+            ++it;
+        }
+    }
+    writeToFile("agenda.data");
+    return count;
+}
+
+void Storage::createMeeting(const Meeting& m) {
+    meetingList_.push_back(m);
+}
+
+list<Meeting> Storage::queryMeeting(function<bool(const Meeting&)> filter) {
+    list<Meeting>::iterator it = meetingList_.begin();
+    list<Meeting> u;
+    for ( ; it != meetingList_.end(); ++it ) {
+        if ( filter(*it) ) {
+            u.push_back(*it);
+        }
+    }
+    writeToFile("agenda.data");
+    return u;
+}
+
+int Storage::updateMeeting(function<bool(const Meeting&)> filter,
+                  function<void(Meeting&)> switcher) {
+    int count = 0;
+    list<Meeting>::iterator it = meetingList_.begin();
+    for ( ; it != meetingList_.end(); ++it ) {
+        if ( filter(*it) ) {
+            switcher(*it);
+            count++;
+        }
+    }
+    writeToFile("agenda.data");
+    return count;
+}
+
+int Storage::deleteMeeting(std::function<bool(const Meeting&)> filter) {
+    int count = 0;
+    list<Meeting>::iterator it = meetingList_.begin();
+    for ( ; it != meetingList_.end(); ) {
+        if ( filter(*it) ) {
+            it = meetingList_.erase(it);
+            count++;
+        } else {
+            ++it;
+        }
+    }
+    writeToFile("agenda.data");
+    return count;
+}
+
+bool Storage::sync(void) {
+    return writeToFile("agenda.data");
+}
+
